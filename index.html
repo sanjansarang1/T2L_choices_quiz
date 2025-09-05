@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>STEM Interests Survey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg:#0b1220; --card:#0f172a; --muted:#94a3b8; --text:#e5e7eb; --accent:#38bdf8; --accent-2:#22d3ee;
+    }
+    * { box-sizing:border-box }
+    body { margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:linear-gradient(180deg, #0b1220, #111827); color:var(--text); }
+    .wrap { max-width:980px; margin:24px auto; padding:24px; }
+    .card { background:rgba(15,23,42,.7); backdrop-filter: blur(8px); border:1px solid rgba(148,163,184,.15); border-radius:18px; padding:24px; box-shadow: 0 8px 40px rgba(2,6,23,.5); }
+    h1 { font-size: clamp(24px, 3.2vw, 40px); margin:0 0 8px; font-weight:800; letter-spacing:-.01em; }
+    p.lead { color:var(--muted); margin:0 0 20px; }
+    .grid { display:grid; gap:16px; }
+    @media(min-width:900px){ .grid-2{ grid-template-columns: 1.1fr .9fr } }
+    .question { background:rgba(2,6,23,.4); border:1px solid rgba(148,163,184,.12); border-radius:14px; padding:16px; }
+    .q-title { font-weight:600; margin:0 0 10px; }
+    .scale { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .scale label { display:flex; gap:8px; align-items:center; background:rgba(15,23,42,.65); padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,184,.15); cursor:pointer; }
+    .scale input { accent-color: var(--accent); }
+    .muted { color:var(--muted) }
+    .btns { display:flex; gap:12px; flex-wrap:wrap; margin-top:18px }
+    button, .btn { border:0; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color:#0b1220; font-weight:700; padding:10px 14px; border-radius:12px; cursor:pointer; box-shadow:0 8px 24px rgba(34,211,238,.25); }
+    button.ghost { background:transparent; color:var(--text); border:1px solid rgba(148,163,184,.25); box-shadow:none }
+    .result { background:rgba(2,6,23,.5); border:1px solid rgba(148,163,184,.15); border-radius:14px; padding:16px; }
+    table { width:100%; border-collapse:collapse; border:1px solid rgba(148,163,184,.15); border-radius:12px; overflow:hidden }
+    th, td { text-align:left; padding:10px 12px; border-bottom:1px solid rgba(148,163,184,.12) }
+    th { background:rgba(56,189,248,.12) }
+    tr:last-child td { border-bottom:0 }
+    .tag { display:inline-block; background:rgba(56,189,248,.16); color:#e0f2fe; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700 }
+    .qr-box { display:grid; place-items:center; background:rgba(2,6,23,.5); border:1px solid rgba(148,163,184,.15); border-radius:14px; min-height:260px }
+    .foot { color:var(--muted); font-size:12px; margin-top:10px }
+    .req { color:#fca5a5; font-size:12px; font-weight:700 }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>STEM Interests Survey</h1>
+      <p class="lead">Rate each statement from <strong>0 (not at all)</strong> to <strong>5 (very much)</strong>. When you finish, click <em>Get Suggested Category</em>. A QR share tool is built in so you can distribute the form easily.</p>
+      <div class="grid grid-2">
+        <section id="form-col">
+          <form id="quiz" class="grid" novalidate></form>
+          <div class="btns">
+            <button type="button" id="submitBtn">Get Suggested Category</button>
+            <button type="button" class="ghost" id="resetBtn">Reset</button>
+            <button type="button" class="ghost" id="exportBtn" title="Download all responses as CSV">Export CSV</button>
+          </div>
+          <p class="foot">Need all questions answered? <span class="req" id="reqMsg" hidden>Answer every item before submitting.</span></p>
+        </section>
+        <aside class="grid" style="gap:16px">
+          <div class="result" id="resultBox" aria-live="polite">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px">
+              <h2 style="margin:0">Result</h2>
+              <span class="tag" id="statusTag">Awaiting input</span>
+            </div>
+            <p class="muted" id="resultText">Complete the survey to see your suggested category.</p>
+            <div id="scoresWrap" hidden>
+              <h3 style="margin:8px 0 6px">Category scores</h3>
+              <table id="scoreTable" aria-label="Category scores table">
+                <thead><tr><th>Category</th><th>Score</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="qr-box" id="qrBox">
+            <div style="text-align:center">
+              <div id="qrcode"></div>
+              <p class="muted" style="margin:10px 0 0">Scan to open this form</p>
+              <div class="btns" style="justify-content:center; margin-top:10px">
+                <button type="button" class="ghost" id="refreshQR">Refresh QR</button>
+                <button type="button" class="ghost" id="copyLink">Copy link</button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const QUESTIONS = [
+      "I enjoy working with plants/gardening.",
+      "I enjoy making and understanding graphs.",
+      "I have experience with computers (coding).",
+      "I enjoy learning about illnesses and how people get them.",
+      "I enjoy building structures, models, legos, etc.",
+      "I am interested in how humans interact with the Earth.",
+      "I use a computer to make drawings or edit pictures.",
+      "I would enjoy doing my project mostly outside.",
+      "I enjoy taking care of/ feeding animals and being with animals for long periods of time.",
+      "I enjoy learning about memory, learning, and why people do things.",
+      "I prefer thinking about a problem in my head more than doing work with my hands.",
+      "I take things apart to see how they work.",
+      "I’m good at math and would do it for fun.",
+      "I am interested in why animals do what they do.",
+      "I would be ok going up and asking lots of people to participate in my project.",
+      "I have the responsibility to take care of something for a long time.",
+      "I would take the time to learn to make an educational game.",
+      "I enjoy coming up with sketches/designs for different things.",
+      "I am interested in the human body and how people stay healthy.",
+      "I am interested in the non-living aspects of our world (soil, nature, weather).",
+      "I enjoy building and/or am interested in robots and how they work.",
+      "I want to learn how to code.",
+      "I am interested in the big problems the Earth faces such as climate change and pollution.",
+      "I am interested in learning the concepts of the forces of nature (gravity, magnetism, etc.)."
+    ];
+
+    // Category mapping (indices correspond to the QUESTIONS above)
+    const CATEGORY_MAP = {
+      "Plant Science and Animal Science": [0, 8, 13, 16],
+      "Computer Science": [2, 6, 16, 21],
+      "Medicine/Health and Behavioral Sciences": [3, 9, 14, 18],
+      "Engineering": [4, 11, 17, 20],
+      "Earth/Environmental": [5, 7, 19, 22],
+      "Mathematics and Physics": [1, 10, 12, 23]
+    };
+
+    const quizEl = document.getElementById('quiz');
+    const reqMsg = document.getElementById('reqMsg');
+    const statusTag = document.getElementById('statusTag');
+    const resultText = document.getElementById('resultText');
+    const scoresWrap = document.getElementById('scoresWrap');
+    const scoreTableBody = document.querySelector('#scoreTable tbody');
+
+    // Build the form
+    function buildForm(){
+      quizEl.innerHTML = '';
+      QUESTIONS.forEach((q, idx) => {
+        const field = document.createElement('fieldset');
+        field.className = 'question';
+        field.innerHTML = `
+          <legend class="q-title">${idx+1}. ${q}</legend>
+          <div class="scale" role="radiogroup" aria-label="Rating from 0 to 5">
+            ${[0,1,2,3,4,5].map(v => `
+              <label>
+                <input type="radio" name="q${idx}" value="${v}" required />
+                <span>${v}</span>
+              </label>
+            `).join('')}
+          </div>
+        `;
+        quizEl.appendChild(field);
+      });
+    }
+
+    function getRatings(){
+      const ratings = [];
+      for (let i=0; i<QUESTIONS.length; i++){
+        const checked = document.querySelector(`input[name="q${i}"]:checked`);
+        ratings.push(checked ? Number(checked.value) : null);
+      }
+      return ratings;
+    }
+
+    function validateRatings(ratings){
+      return ratings.every(v => v !== null);
+    }
+
+    function sumCategory(ratings, idxs){
+      return idxs.reduce((acc,i) => acc + ratings[i], 0);
+    }
+
+    function computeScores(ratings){
+      const entries = Object.entries(CATEGORY_MAP).map(([cat, idxs]) => [cat, sumCategory(ratings, idxs)]);
+      entries.sort((a,b) => b[1]-a[1]);
+      return entries; // sorted desc
+    }
+
+    function renderScores(entries){
+      scoreTableBody.innerHTML = entries.map(([cat,score]) => `<tr><td>${cat}</td><td>${score}</td></tr>`).join('');
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', () => {
+      const ratings = getRatings();
+      if(!validateRatings(ratings)){
+        reqMsg.hidden = false;
+        statusTag.textContent = 'Incomplete';
+        resultText.textContent = 'Please answer all questions (0–5).';
+        scoresWrap.hidden = true;
+        return;
+      }
+      reqMsg.hidden = true;
+      const scores = computeScores(ratings);
+      const top = scores[0];
+      statusTag.textContent = 'Complete';
+      resultText.innerHTML = `Suggested category is <strong>${top[0]}</strong>.`;
+      renderScores(scores);
+      scoresWrap.hidden = false;
+      saveAttempt(ratings, scores);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      buildForm();
+      reqMsg.hidden = true;
+      statusTag.textContent = 'Awaiting input';
+      resultText.textContent = 'Complete the survey to see your suggested category.';
+      scoresWrap.hidden = true;
+    });
+
+    // Minimal CSV export (local attempts only)
+    function saveAttempt(ratings, scores){
+      const rec = { time: new Date().toISOString(), ratings, top: scores[0][0], scores: Object.fromEntries(scores) };
+      const key = 'stem_interests_attempts_v1';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      arr.push(rec);
+      localStorage.setItem(key, JSON.stringify(arr));
+    }
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const key = 'stem_interests_attempts_v1';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      if(arr.length === 0){
+        alert('No attempts found yet on this device.');
+        return;
+      }
+      const headers = ['time', ...QUESTIONS.map((_,i)=>`q${i}`), 'top', ...Object.keys(CATEGORY_MAP)];
+      const lines = [headers.join(',')];
+      for(const a of arr){
+        const row = [a.time, ...a.ratings, a.top, ...Object.keys(CATEGORY_MAP).map(k => a.scores[k] ?? '')];
+        lines.push(row.join(','));
+      }
+      const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'stem_interests_attempts.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // QR share
+    let qr;
+    function makeQR(){
+      const node = document.getElementById('qrcode');
+      node.innerHTML = '';
+      const url = window.location.href;
+      qr = new QRCode(node, { text:url, width:192, height:192, correctLevel: QRCode.CorrectLevel.M });
+    }
+    document.getElementById('refreshQR').addEventListener('click', makeQR);
+
+    document.getElementById('copyLink').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(window.location.href); alert('Link copied!'); }
+      catch(e){ alert('Could not copy link.'); }
+    });
+
+    // Init
+    buildForm();
+    makeQR();
+  </script>
+</body>
+</html>
